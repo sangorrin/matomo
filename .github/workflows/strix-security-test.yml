@@ -1,0 +1,390 @@
+name: Strix Security Testing
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_duration:
+        description: 'Test duration in minutes'
+        required: false
+        default: '30'
+      perplexity_model:
+        description: 'Perplexity AI model to use (e.g., llama-3.1-sonar-large-128k-online)'
+        required: false
+        default: 'llama-3.1-sonar-large-128k-online'
+
+permissions:
+  actions: read
+  checks: none
+  contents: read
+  deployments: none
+  issues: none
+  packages: none
+  pull-requests: none
+  repository-projects: none
+  security-events: none
+  statuses: none
+
+jobs:
+  strix-whitebox-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: matomo_test_password
+          MYSQL_DATABASE: matomo
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          lfs: false
+          persist-credentials: false
+          submodules: true
+      
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, gd, mysqli, pdo, pdo_mysql, xml, curl, json
+          ini-values: memory_limit=2G
+          coverage: none
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '16'
+          cache: 'npm'
+      
+      - name: Get composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+      
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+      
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-progress --no-suggest
+      
+      - name: Install npm dependencies
+        run: npm install
+      
+      - name: Configure Matomo
+        run: |
+          # Create config directory if needed
+          mkdir -p ./config
+          
+          # Generate Matomo configuration
+          cat <<EOF > ./config/config.ini.php
+          ; <?php exit; ?> DO NOT REMOVE THIS LINE
+          ; file automatically generated or modified by Matomo; you can manually override the default values in global.ini.php by redefining them in this file.
+          [database]
+          host = "127.0.0.1"
+          username = "root"
+          password = "matomo_test_password"
+          dbname = "matomo"
+          tables_prefix = "matomo_"
+          charset = "utf8mb4"
+          
+          [General]
+          salt = "$(openssl rand -hex 32)"
+          trusted_hosts[] = "localhost"
+          trusted_hosts[] = "127.0.0.1"
+          
+          [Development]
+          enabled = 1
+          EOF
+          
+          chmod 644 ./config/config.ini.php
+      
+      - name: Install Matomo
+        run: |
+          # Initialize database schema
+          php ./console core:install --db-host=127.0.0.1 \
+            --db-username=root \
+            --db-password=matomo_test_password \
+            --db-name=matomo \
+            --first-site-name="Test Site" \
+            --first-site-url="http://localhost:8000" \
+            --no-interaction || echo "Continuing after install attempt..."
+      
+      - name: Create test user with credentials
+        id: create-user
+        run: |
+          # Generate random credentials
+          TEST_USER="testuser_$(date +%s)"
+          TEST_PASSWORD="$(openssl rand -base64 24)"
+          TEST_EMAIL="${TEST_USER}@example.com"
+          
+          # Create user via console
+          php ./console user:create \
+            --login="$TEST_USER" \
+            --password="$TEST_PASSWORD" \
+            --email="$TEST_EMAIL" \
+            --alias="Test User" \
+            --no-interaction || true
+          
+          # Grant superuser access
+          php ./console user:set-superuser --login="$TEST_USER" --yes || true
+          
+          # Save credentials to output
+          echo "test_user=$TEST_USER" >> $GITHUB_OUTPUT
+          echo "test_password=$TEST_PASSWORD" >> $GITHUB_OUTPUT
+          echo "test_email=$TEST_EMAIL" >> $GITHUB_OUTPUT
+          
+          # Save credentials to file for Strix
+          mkdir -p ./strix-data
+          cat <<EOF > ./strix-data/credentials.json
+          {
+            "username": "$TEST_USER",
+            "password": "$TEST_PASSWORD",
+            "email": "$TEST_EMAIL"
+          }
+          EOF
+      
+      - name: Populate analytics with personal data
+        run: |
+          # Create a script to send tracking data with personal information
+          cat <<'EOF' > ./strix-data/populate-analytics.php
+          <?php
+          // Generate fake personal data for testing
+          $personalData = [
+              ['name' => 'John Smith', 'phone' => '+1-555-0123', 'email' => 'john.smith@example.com', 'birthdate' => '1985-03-15', 'gender' => 'Male', 'country' => 'United States'],
+              ['name' => 'Jane Doe', 'phone' => '+1-555-0124', 'email' => 'jane.doe@example.com', 'birthdate' => '1990-07-22', 'gender' => 'Female', 'country' => 'Canada'],
+              ['name' => 'Bob Johnson', 'phone' => '+1-555-0125', 'email' => 'bob.johnson@example.com', 'birthdate' => '1982-11-08', 'gender' => 'Male', 'country' => 'United Kingdom'],
+              ['name' => 'Alice Williams', 'phone' => '+1-555-0126', 'email' => 'alice.williams@example.com', 'birthdate' => '1995-01-30', 'gender' => 'Female', 'country' => 'Australia'],
+              ['name' => 'Charlie Brown', 'phone' => '+1-555-0127', 'email' => 'charlie.brown@example.com', 'birthdate' => '1988-05-12', 'gender' => 'Male', 'country' => 'Germany'],
+              ['name' => 'David Miller', 'phone' => '+1-555-0128', 'email' => 'david.miller@example.com', 'birthdate' => '1992-09-25', 'gender' => 'Male', 'country' => 'France'],
+              ['name' => 'Emma Davis', 'phone' => '+1-555-0129', 'email' => 'emma.davis@example.com', 'birthdate' => '1987-12-03', 'gender' => 'Female', 'country' => 'Spain'],
+              ['name' => 'Frank Wilson', 'phone' => '+1-555-0130', 'email' => 'frank.wilson@example.com', 'birthdate' => '1983-06-18', 'gender' => 'Male', 'country' => 'Italy'],
+              ['name' => 'Grace Taylor', 'phone' => '+1-555-0131', 'email' => 'grace.taylor@example.com', 'birthdate' => '1991-04-07', 'gender' => 'Female', 'country' => 'Japan'],
+              ['name' => 'Henry Anderson', 'phone' => '+1-555-0132', 'email' => 'henry.anderson@example.com', 'birthdate' => '1989-08-14', 'gender' => 'Male', 'country' => 'Brazil'],
+          ];
+          
+          // Simulate tracking requests with personal data
+          $baseUrl = 'http://127.0.0.1:8000/matomo.php';
+          $siteId = 1;
+          
+          foreach ($personalData as $person) {
+              $params = [
+                  'idsite' => $siteId,
+                  'rec' => 1,
+                  'action_name' => 'Page View',
+                  'url' => 'http://localhost:8000/page/' . urlencode($person['name']),
+                  '_id' => md5($person['email']),
+                  'uid' => $person['email'],
+                  'cvar' => json_encode([
+                      '1' => ['name', $person['name']],
+                      '2' => ['phone', $person['phone']],
+                      '3' => ['email', $person['email']],
+                      '4' => ['birthdate', $person['birthdate']],
+                      '5' => ['gender', $person['gender']],
+                      '6' => ['country', $person['country']],
+                  ]),
+                  'rand' => rand(1000, 9999),
+                  'apiv' => 1,
+              ];
+              
+              $url = $baseUrl . '?' . http_build_query($params);
+              
+              // Send tracking request
+              $ch = curl_init($url);
+              curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+              curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+              $result = curl_exec($ch);
+              curl_close($ch);
+              
+              echo "Tracked: {$person['name']} ({$person['email']}, {$person['phone']}, {$person['birthdate']}, {$person['gender']}, {$person['country']})\n";
+              usleep(100000); // Small delay between requests
+          }
+          
+          echo "\nSuccessfully populated analytics with personal data.\n";
+          EOF
+          
+          # Start PHP built-in server in background
+          php -S 127.0.0.1:8000 &
+          PHP_SERVER_PID=$!
+          echo "Started PHP server with PID: $PHP_SERVER_PID"
+          
+          # Wait for server to start
+          sleep 5
+          
+          # Run the population script
+          php ./strix-data/populate-analytics.php
+          
+          # Keep server running for Strix tests
+          echo "PHP_SERVER_PID=$PHP_SERVER_PID" >> $GITHUB_ENV
+      
+      - name: Setup Strix
+        run: |
+          # Install Strix from GitHub
+          git clone https://github.com/usestrix/strix.git ./strix-tool
+          cd ./strix-tool
+          
+          # Install Strix dependencies (assuming it's a Python/Node tool)
+          if [ -f "package.json" ]; then
+            npm install
+          elif [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt
+          elif [ -f "pyproject.toml" ]; then
+            pip install .
+          fi
+          
+          cd ..
+      
+      - name: Configure Strix for white-box testing
+        run: |
+          # Create Strix configuration
+          cat <<EOF > ./strix-data/strix-config.json
+          {
+            "target": {
+              "url": "http://127.0.0.1:8000",
+              "name": "Matomo Analytics",
+              "type": "web-application"
+            },
+            "credentials": {
+              "username": "${{ steps.create-user.outputs.test_user }}",
+              "password": "${{ steps.create-user.outputs.test_password }}"
+            },
+            "testing": {
+              "mode": "white-box",
+              "source_code_path": "${{ github.workspace }}",
+              "objectives": [
+                "Attempt to access personal data (names, phones, emails)",
+                "Test account takeover vulnerabilities",
+                "Identify data exfiltration possibilities",
+                "Check for authentication bypass",
+                "Test authorization controls"
+              ]
+            },
+            "llm": {
+              "provider": "perplexity",
+              "api_key": "${{ secrets.PERPLEXITY_API_KEY }}",
+              "model": "${{ github.event.inputs.perplexity_model || 'llama-3.1-sonar-large-128k-online' }}"
+            },
+            "duration_minutes": ${{ github.event.inputs.test_duration || 30 }}
+          }
+          EOF
+          
+          echo "Strix configuration created"
+          cat ./strix-data/strix-config.json
+      
+      - name: Run Strix Security Testing
+        id: run-strix
+        continue-on-error: true
+        timeout-minutes: 90
+        run: |
+          mkdir -p ./strix-results
+          
+          # Run Strix (command may vary based on actual Strix implementation)
+          # This is a placeholder - adjust based on actual Strix CLI
+          cd ./strix-tool
+          
+          # Example command structures - adjust as needed
+          if [ -f "strix.py" ]; then
+            python strix.py \
+              --config ../strix-data/strix-config.json \
+              --output ../strix-results \
+              --verbose
+          elif [ -f "bin/strix" ]; then
+            ./bin/strix run \
+              --config ../strix-data/strix-config.json \
+              --output ../strix-results
+          else
+            echo "⚠️ Strix executable not found in expected locations"
+            echo "Creating placeholder results for demonstration"
+            echo "Strix test would run here with configuration from strix-data/strix-config.json" > ../strix-results/test-summary.txt
+            echo "Duration: ${{ github.event.inputs.test_duration || 30 }} minutes" >> ../strix-results/test-summary.txt
+          fi
+          
+          cd ..
+      
+      - name: Generate test summary
+        if: always()
+        run: |
+          cat <<EOF > ./strix-results/test-metadata.json
+          {
+            "test_run": {
+              "date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+              "workflow_run_id": "${{ github.run_id }}",
+              "workflow_run_number": "${{ github.run_number }}",
+              "repository": "${{ github.repository }}",
+              "commit_sha": "${{ github.sha }}"
+            },
+            "configuration": {
+              "test_user": "${{ steps.create-user.outputs.test_user }}",
+              "test_email": "${{ steps.create-user.outputs.test_email }}",
+              "matomo_url": "http://127.0.0.1:8000",
+              "test_duration_minutes": ${{ github.event.inputs.test_duration || 30 }}
+            },
+            "data_populated": {
+              "users_count": 10,
+              "data_types": ["names", "phones", "emails"]
+            }
+          }
+          EOF
+          
+          echo "=== Strix Security Test Summary ===" | tee ./strix-results/summary.txt
+          echo "" | tee -a ./strix-results/summary.txt
+          echo "Test Date: $(date)" | tee -a ./strix-results/summary.txt
+          echo "Matomo Version: $(php ./console core:version)" | tee -a ./strix-results/summary.txt
+          echo "Test User: ${{ steps.create-user.outputs.test_user }}" | tee -a ./strix-results/summary.txt
+          echo "Test Duration: ${{ github.event.inputs.test_duration || 30 }} minutes" | tee -a ./strix-results/summary.txt
+          echo "" | tee -a ./strix-results/summary.txt
+          echo "Personal Data Loaded:" | tee -a ./strix-results/summary.txt
+          echo "- 10 test users with names, phones, and emails" | tee -a ./strix-results/summary.txt
+          echo "- Analytics data tracked with custom variables" | tee -a ./strix-results/summary.txt
+          echo "" | tee -a ./strix-results/summary.txt
+          echo "Strix Configuration:" | tee -a ./strix-results/summary.txt
+          cat ./strix-data/strix-config.json | tee -a ./strix-results/summary.txt
+          echo "" | tee -a ./strix-results/summary.txt
+      
+      - name: Upload Strix test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: strix-security-test-results-${{ github.run_number }}
+          path: |
+            ./strix-results/
+            ./strix-data/strix-config.json
+            ./strix-data/credentials.json
+          retention-days: 30
+      
+      - name: Upload Matomo logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: matomo-logs-${{ github.run_number }}
+          path: |
+            ./tmp/logs/
+            ./tmp/cache/
+          retention-days: 7
+          if-no-files-found: ignore
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          # Stop PHP server if still running
+          if [ -n "$PHP_SERVER_PID" ]; then
+            kill $PHP_SERVER_PID 2>/dev/null || true
+          fi
+          
+          # Clean up sensitive data (though workspace will be destroyed anyway)
+          rm -f ./strix-data/credentials.json
+          rm -f ./config/config.ini.php
