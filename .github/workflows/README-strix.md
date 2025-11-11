@@ -12,6 +12,9 @@ This workflow implements automated white-box security testing using Strix (https
    - Names (e.g., John Smith, Jane Doe)
    - Phone numbers (e.g., +1-555-0123)
    - Email addresses (e.g., john.smith@example.com)
+   - Birthdates (e.g., 1985-03-15)
+   - Gender (e.g., Male, Female)
+   - Country (e.g., United States, Canada)
 4. **Runs Strix Agents**: Executes Strix security testing agents that attempt to:
    - Hack the test user account
    - Steal personal data from analytics
@@ -36,7 +39,9 @@ You can manually trigger the workflow:
 1. Go to Actions tab in GitHub
 2. Select "Strix Security Testing" workflow
 3. Click "Run workflow"
-4. Optionally specify test duration (default: 30 minutes)
+4. Optionally specify:
+   - Test duration (default: 30 minutes)
+   - Perplexity AI model (default: llama-3.1-sonar-large-128k-online)
 
 ## Reviewing Results
 
@@ -53,7 +58,7 @@ The workflow performs white-box testing with:
 - **Target**: Locally deployed Matomo instance
 - **Source Code Access**: Full repository source code
 - **Test Objectives**:
-  - Attempt to access personal data (names, phones, emails)
+  - Attempt to access personal data (names, phones, emails, birthdates, gender, country)
   - Test account takeover vulnerabilities
   - Identify data exfiltration possibilities
   - Check for authentication bypass
@@ -65,6 +70,9 @@ The workflow creates synthetic test data for 10 users, each with:
 - Full name
 - Phone number
 - Email address
+- Birthdate
+- Gender
+- Country
 
 This data is sent as custom variables in Matomo tracking requests to simulate real-world analytics collection.
 
@@ -80,9 +88,14 @@ This data is sent as custom variables in Matomo tracking requests to simulate re
 
 You can customize the test by modifying:
 - Test duration via workflow dispatch input
+- Perplexity AI model via workflow dispatch input
 - Personal data templates in the "Populate analytics with personal data" step
 - Strix configuration in the "Configure Strix for white-box testing" step
 - Test objectives and targets
+
+## Other Workflows
+
+All other GitHub Actions workflows have been moved to `.github/upstream-workflows/` to keep them available for future re-integration while ensuring only the Strix security testing workflow runs.
 
 ## Troubleshooting
 

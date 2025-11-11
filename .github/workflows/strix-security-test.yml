@@ -10,6 +10,10 @@ on:
         description: 'Test duration in minutes'
         required: false
         default: '30'
+      perplexity_model:
+        description: 'Perplexity AI model to use (e.g., llama-3.1-sonar-large-128k-online)'
+        required: false
+        default: 'llama-3.1-sonar-large-128k-online'
 
 permissions:
   actions: read
@@ -161,16 +165,16 @@ jobs:
           <?php
           // Generate fake personal data for testing
           $personalData = [
-              ['name' => 'John Smith', 'phone' => '+1-555-0123', 'email' => 'john.smith@example.com'],
-              ['name' => 'Jane Doe', 'phone' => '+1-555-0124', 'email' => 'jane.doe@example.com'],
-              ['name' => 'Bob Johnson', 'phone' => '+1-555-0125', 'email' => 'bob.johnson@example.com'],
-              ['name' => 'Alice Williams', 'phone' => '+1-555-0126', 'email' => 'alice.williams@example.com'],
-              ['name' => 'Charlie Brown', 'phone' => '+1-555-0127', 'email' => 'charlie.brown@example.com'],
-              ['name' => 'David Miller', 'phone' => '+1-555-0128', 'email' => 'david.miller@example.com'],
-              ['name' => 'Emma Davis', 'phone' => '+1-555-0129', 'email' => 'emma.davis@example.com'],
-              ['name' => 'Frank Wilson', 'phone' => '+1-555-0130', 'email' => 'frank.wilson@example.com'],
-              ['name' => 'Grace Taylor', 'phone' => '+1-555-0131', 'email' => 'grace.taylor@example.com'],
-              ['name' => 'Henry Anderson', 'phone' => '+1-555-0132', 'email' => 'henry.anderson@example.com'],
+              ['name' => 'John Smith', 'phone' => '+1-555-0123', 'email' => 'john.smith@example.com', 'birthdate' => '1985-03-15', 'gender' => 'Male', 'country' => 'United States'],
+              ['name' => 'Jane Doe', 'phone' => '+1-555-0124', 'email' => 'jane.doe@example.com', 'birthdate' => '1990-07-22', 'gender' => 'Female', 'country' => 'Canada'],
+              ['name' => 'Bob Johnson', 'phone' => '+1-555-0125', 'email' => 'bob.johnson@example.com', 'birthdate' => '1982-11-08', 'gender' => 'Male', 'country' => 'United Kingdom'],
+              ['name' => 'Alice Williams', 'phone' => '+1-555-0126', 'email' => 'alice.williams@example.com', 'birthdate' => '1995-01-30', 'gender' => 'Female', 'country' => 'Australia'],
+              ['name' => 'Charlie Brown', 'phone' => '+1-555-0127', 'email' => 'charlie.brown@example.com', 'birthdate' => '1988-05-12', 'gender' => 'Male', 'country' => 'Germany'],
+              ['name' => 'David Miller', 'phone' => '+1-555-0128', 'email' => 'david.miller@example.com', 'birthdate' => '1992-09-25', 'gender' => 'Male', 'country' => 'France'],
+              ['name' => 'Emma Davis', 'phone' => '+1-555-0129', 'email' => 'emma.davis@example.com', 'birthdate' => '1987-12-03', 'gender' => 'Female', 'country' => 'Spain'],
+              ['name' => 'Frank Wilson', 'phone' => '+1-555-0130', 'email' => 'frank.wilson@example.com', 'birthdate' => '1983-06-18', 'gender' => 'Male', 'country' => 'Italy'],
+              ['name' => 'Grace Taylor', 'phone' => '+1-555-0131', 'email' => 'grace.taylor@example.com', 'birthdate' => '1991-04-07', 'gender' => 'Female', 'country' => 'Japan'],
+              ['name' => 'Henry Anderson', 'phone' => '+1-555-0132', 'email' => 'henry.anderson@example.com', 'birthdate' => '1989-08-14', 'gender' => 'Male', 'country' => 'Brazil'],
           ];
           
           // Simulate tracking requests with personal data
@@ -189,6 +193,9 @@ jobs:
                       '1' => ['name', $person['name']],
                       '2' => ['phone', $person['phone']],
                       '3' => ['email', $person['email']],
+                      '4' => ['birthdate', $person['birthdate']],
+                      '5' => ['gender', $person['gender']],
+                      '6' => ['country', $person['country']],
                   ]),
                   'rand' => rand(1000, 9999),
                   'apiv' => 1,
@@ -203,7 +210,7 @@ jobs:
               $result = curl_exec($ch);
               curl_close($ch);
               
-              echo "Tracked: {$person['name']} ({$person['email']}, {$person['phone']})\n";
+              echo "Tracked: {$person['name']} ({$person['email']}, {$person['phone']}, {$person['birthdate']}, {$person['gender']}, {$person['country']})\n";
               usleep(100000); // Small delay between requests
           }
           
@@ -268,7 +275,8 @@ jobs:
             },
             "llm": {
               "provider": "perplexity",
-              "api_key": "${{ secrets.PERPLEXITY_API_KEY }}"
+              "api_key": "${{ secrets.PERPLEXITY_API_KEY }}",
+              "model": "${{ github.event.inputs.perplexity_model || 'llama-3.1-sonar-large-128k-online' }}"
             },
             "duration_minutes": ${{ github.event.inputs.test_duration || 30 }}
           }

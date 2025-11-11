@@ -55,7 +55,6 @@ env:
 
 jobs:
   release:
-    if: false  # Workflow disabled - only Strix security testing workflow should run
     runs-on: ubuntu-24.04
     steps:
       - name: "Check release password"

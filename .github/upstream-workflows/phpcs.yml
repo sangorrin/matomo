@@ -16,7 +16,6 @@ permissions:
 
 jobs:
   phpcs:
-    if: false  # Workflow disabled - only Strix security testing workflow should run
     name: PHPCS
     runs-on: ubuntu-24.04
     steps:
