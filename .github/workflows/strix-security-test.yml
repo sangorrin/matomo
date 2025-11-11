@@ -267,8 +267,8 @@ jobs:
               ]
             },
             "llm": {
-              "provider": "${{ secrets.STRIX_LLM || 'openai' }}",
-              "api_key": "${{ secrets.LLM_API_KEY }}"
+              "provider": "perplexity",
+              "api_key": "${{ secrets.PERPLEXITY_API_KEY }}"
             },
             "duration_minutes": ${{ github.event.inputs.test_duration || 30 }}
           }

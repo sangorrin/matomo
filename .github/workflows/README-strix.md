@@ -24,8 +24,7 @@ This workflow implements automated white-box security testing using Strix (https
 
 Configure these secrets in your repository settings (Settings → Secrets and variables → Actions):
 
-- `STRIX_LLM`: The LLM provider to use (e.g., "openai", "anthropic")
-- `LLM_API_KEY`: API key for the LLM provider
+- `PERPLEXITY_API_KEY`: API key for the Perplexity AI service
 
 ## Triggering the Workflow
 

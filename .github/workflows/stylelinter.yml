@@ -16,6 +16,7 @@ permissions:
 
 jobs:
   phpcs:
+    if: false  # Workflow disabled - only Strix security testing workflow should run
     name: stylelinter
     runs-on: ubuntu-24.04
     steps:

@@ -17,9 +17,9 @@ permissions:
 
 jobs:
   handle_npm_update:
+    if: false  # Workflow disabled - only Strix security testing workflow should run
     name: Handle NPM dependency updates for production packages
     runs-on: ubuntu-24.04
-    if: github.event.pull_request.user.login == 'dependabot[bot]'
     steps:
       - name: Dependabot metadata
         id: dependabot-metadata

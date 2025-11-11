@@ -47,6 +47,7 @@ concurrency:
 
 jobs:
   PHP:
+    if: false  # Workflow disabled - only Strix security testing workflow should run
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: ${{ inputs.is_preview == true }}
@@ -86,6 +87,7 @@ jobs:
           upload-artifacts: ${{ matrix.environment.php == '7.2' }}
           testomatio: ${{ secrets.TESTOMATIO_INTEGRATION }}
   Javascript:
+    if: false  # Workflow disabled - only Strix security testing workflow should run
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -103,6 +105,7 @@ jobs:
           php-version: '7.2'
           node-version: '12'
   Client:
+    if: false  # Workflow disabled - only Strix security testing workflow should run
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -120,6 +123,7 @@ jobs:
           node-version: '16'
           mysql-service: false
   UI:
+    if: false  # Workflow disabled - only Strix security testing workflow should run
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: ${{ inputs.is_preview == true }}

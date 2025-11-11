@@ -16,6 +16,7 @@ permissions:
 
 jobs:
   phpstan:
+    if: false  # Workflow disabled - only Strix security testing workflow should run
     name: PHPStan
     runs-on: ubuntu-latest
     steps:

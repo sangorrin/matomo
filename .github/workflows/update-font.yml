@@ -24,6 +24,7 @@ permissions:
 
 jobs:
   check:
+    if: false  # Workflow disabled - only Strix security testing workflow should run
     runs-on: ubuntu-24.04
     steps:
      - uses: actions/checkout@v5
